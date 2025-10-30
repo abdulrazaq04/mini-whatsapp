@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const path = require("path");
 const Chat = require("./models/chat.js");
 const methodOverride = require("method-override");
+const ExpressError = require("./ExpressError");
 
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
@@ -21,19 +22,25 @@ async function main() {
 }
 
 //Index Route
-app.get("/chats", async (req, res) => {
-    let chats = await Chat.find();
-    // console.log(chats);
-    res.render("index.ejs", {chats});
+app.get("/chats", async (req, res, next) => {
+    try {
+        let chats = await Chat.find();
+        // console.log(chats);
+        res.render("index.ejs", {chats});
+    } catch (error) {
+        next(new ExpressError("Failed to retrieve chats", 500));
+    }
 });
 
 //New Route
-app.get("/chats/new", (req, res) => {
+app.get("/chats/new", (req, res, next) => {
+    // throw new ExpressError("This is a forced error", 500);
     res.render("new.ejs");
 });
 
 //Create Route
-app.post("/chats", (req, res) => {
+app.post("/chats", (req, res, next) => {
+    try{
     let {from, to, msg} = req.body;
     let newChat = new Chat ({
         from: from,
@@ -43,26 +50,49 @@ app.post("/chats", (req, res) => {
     });
     newChat.save().then((res) => {
         console.log("chat was saved");
-    }).catch((err) => {
-        console.log(err);
-    });
-    res.redirect("/chats");
+        res.redirect("/chats");
+    })
+    } catch (error) {
+        next(new ExpressError("Failed to create chat", 500));
+    }
+});
+
+// show route
+app.get("/chats/:id", async (req, res, next) => {
+    try{
+    let {id} = req.params;
+    let chat = await Chat.findById(id);
+    if(!chat){
+        next (new ExpressError("Chat Not Found", 404));
+    }
+    res.render("edit.ejs", {chat});
+    } catch (error) {
+        next(error);
+    }
 });
 
 // edit route
-app.get("/chats/:id/edit", async (req, res) => {
-    let {id} = req.params;
-    let chat = await Chat.findById(id);
-    res.render("edit.ejs", {chat});
+app.get("/chats/:id/edit", async (req, res, next) => {
+    try {
+        let {id} = req.params;
+        let chat = await Chat.findById(id);
+        res.render("edit.ejs", {chat});
+    } catch (error) {
+        next(new ExpressError("Failed to load edit form", 500));
+    }
 });
 
 // Update route
-app.put("/chats/:id", async (req, res) => {
-    let {id} = req.params;
-    let {msg: newMsg} = req.body;
-    let updatedChat = await Chat.findByIdAndUpdate(id, {msg: newMsg}, {runValidators: true, new: true});
-    console.log(updatedChat);
-    res.redirect("/chats");
+app.put("/chats/:id", async (req, res, next) => {
+    try {
+        let {id} = req.params;
+        let {msg: newMsg} = req.body;
+        let updatedChat = await Chat.findByIdAndUpdate(id, {msg: newMsg}, {runValidators: true, new: true});
+        console.log(updatedChat);
+        res.redirect("/chats");
+    } catch (error) {
+        next(new ExpressError("Failed to update chat", 500));
+    }
 });
 
 // destroy route
@@ -75,6 +105,12 @@ app.delete("/chats/:id", async(req, res) => {
 
 app.get("/", (req, res) => {
     res.send("root is working");
+});
+
+// error handler
+app.use((err, req, res, next) => {
+    let {statusCode = 500, message = "Something went wrong"} = err;
+    res.status(statusCode).send(message);
 });
 
 app.listen("8080", () => {
