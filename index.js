@@ -39,61 +39,54 @@ app.get("/chats/new", (req, res, next) => {
 });
 
 //Create Route
-app.post("/chats", (req, res, next) => {
-    try{
+app.post("/chats", wrapAsync(async (req, res, next) => {
     let {from, to, msg} = req.body;
+    if(!from || !to || !msg){
+        throw new ExpressError("All fields are required", 400);
+    }
     let newChat = new Chat ({
         from: from,
         to: to,
         msg: msg,
         created_at: new Date()
     });
-    newChat.save().then((res) => {
+    await newChat.save().then((res) => {
         console.log("chat was saved");
-        res.redirect("/chats");
     })
-    } catch (error) {
-        next(new ExpressError("Failed to create chat", 500));
+    res.redirect("/chats");
+}));
+
+function wrapAsync(fn) {
+    return function(req, res, next) {
+        fn(req, res, next).catch(e => next(e));
     }
-});
+}
 
 // show route
-app.get("/chats/:id", async (req, res, next) => {
-    try{
+app.get("/chats/:id", wrapAsync(async (req, res, next) => {
     let {id} = req.params;
     let chat = await Chat.findById(id);
     if(!chat){
         next (new ExpressError("Chat Not Found", 404));
     }
     res.render("edit.ejs", {chat});
-    } catch (error) {
-        next(error);
-    }
-});
+}));
 
 // edit route
-app.get("/chats/:id/edit", async (req, res, next) => {
-    try {
-        let {id} = req.params;
-        let chat = await Chat.findById(id);
-        res.render("edit.ejs", {chat});
-    } catch (error) {
-        next(new ExpressError("Failed to load edit form", 500));
-    }
-});
+app.get("/chats/:id/edit", wrapAsync(async (req, res, next) => {
+    let {id} = req.params;
+    let chat = await Chat.findById(id);
+    res.render("edit.ejs", {chat});
+}));
 
 // Update route
-app.put("/chats/:id", async (req, res, next) => {
-    try {
-        let {id} = req.params;
-        let {msg: newMsg} = req.body;
-        let updatedChat = await Chat.findByIdAndUpdate(id, {msg: newMsg}, {runValidators: true, new: true});
-        console.log(updatedChat);
-        res.redirect("/chats");
-    } catch (error) {
-        next(new ExpressError("Failed to update chat", 500));
-    }
-});
+app.put("/chats/:id", wrapAsync(async (req, res, next) => {
+    let {id} = req.params;
+    let {msg: newMsg} = req.body;
+    let updatedChat = await Chat.findByIdAndUpdate(id, {msg: newMsg}, {runValidators: true, new: true});
+    console.log(updatedChat);
+    res.redirect("/chats");
+}));
 
 // destroy route
 app.delete("/chats/:id", async(req, res) => {
