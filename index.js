@@ -100,6 +100,20 @@ app.get("/", (req, res) => {
     res.send("root is working");
 });
 
+const handleValidationErr = err => {
+    console.log("This was Validation error. please follow rules");
+    console.dir(err);
+    return new ExpressError(`Validation failed...${err.message}`, 400);
+};
+
+// catch-all error handler
+
+app.use((err, req, res, next) => {
+    console.log(err.name);
+    if (err.name === "ValidationError") err = handleValidationErr(err);
+    next(err);
+});
+
 // error handler
 app.use((err, req, res, next) => {
     let {statusCode = 500, message = "Something went wrong"} = err;
